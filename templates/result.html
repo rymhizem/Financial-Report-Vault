@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} — Financial Vault{% endblock %}
+
+{% block content %}
+<div class="result-wrap">
+  <div class="result-card {{ 'res-success' if success else 'res-error' }}">
+
+    <div class="result-status">
+      <div class="status-icon {{ 'icon-success' if success else 'icon-error' }}">
+        {% if success %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="#3D7A5E" stroke-width="2.5" stroke-linecap="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        {% else %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="#A0394A" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+        {% endif %}
+      </div>
+      <div>
+        <div class="result-title">{{ action }}</div>
+        <div class="result-subtitle">
+          {{ "Operation completed successfully." if success else "The operation could not be completed." }}
+        </div>
+      </div>
+    </div>
+
+    {% if error %}
+    <div class="error-box">{{ error }}</div>
+    {% endif %}
+
+    {% if algorithm %}
+    <div class="result-row">
+      <div class="row-label">Algorithm used</div>
+      <span class="algo-tag
+        {% if algorithm == 'AES-256-CBC' %}tag-aes
+        {% elif algorithm == '3DES' %}tag-3des
+        {% elif algorithm == 'ChaCha20' %}tag-chacha
+        {% endif %}">{{ algorithm }}</span>
+    </div>
+    {% endif %}
+
+    {% if filename %}
+    <div class="result-row">
+      <div class="row-label">Saved as</div>
+      <span class="file-tag">{{ filename }}</span>
+    </div>
+    {% endif %}
+
+    {% if file_hash %}
+    <div class="result-row">
+      <div class="row-label">{{ hash_label or 'SHA-256 fingerprint' }}</div>
+      <div class="hash-block">{{ file_hash }}</div>
+      <p class="hash-note">
+        This 64-character fingerprint uniquely identifies the original file.
+        Changing even one byte produces a completely different hash.
+      </p>
+    </div>
+    {% endif %}
+
+  </div>
+  <a href="{{ url_for('index') }}" class="btn btn-back">Back to Vault</a>
+</div>
+{% endblock %}

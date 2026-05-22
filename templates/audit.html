@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Audit Log — Financial Vault{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px">
+  <div>
+    <div class="page-title">Audit Log</div>
+    <p class="page-sub" style="margin-bottom:0">Timestamped record of every vault operation — SOX compliance ready.</p>
+  </div>
+  {% if logs %}
+  <form action="/audit/clear" method="POST"
+        onsubmit="return confirm('Clear the entire audit log?')" style="margin-bottom:36px">
+    <button type="submit" class="btn btn-sm btn-ghost">Clear log</button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Locked files section -->
+{% set locked = [] %}
+{% for f in logs %}
+  {% if f.status == 'blocked' and f.filename %}
+    {% if f.filename not in locked %}
+      {% set _ = locked.append(f.filename) %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+{% if locked %}
+<div style="background:var(--danger-bg);border:1px solid #e8b4bb;border-radius:var(--radius);padding:16px 20px;margin-bottom:20px">
+  <div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:10px">Locked Files</div>
+  {% for fname in locked %}
+  <form action="/unlock" method="POST" style="display:inline-flex;align-items:center;gap:10px;margin-right:12px;margin-bottom:6px">
+    <input type="hidden" name="enc_file" value="{{ fname }}">
+    <span class="file-name">{{ fname }}</span>
+    <button type="submit" class="btn btn-sm btn-outline">Unlock</button>
+  </form>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="audit-filters">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="ENCRYPT">Encrypt</button>
+  <button class="filter-btn" data-filter="DECRYPT">Decrypt</button>
+  <button class="filter-btn" data-filter="VERIFY">Verify</button>
+  <button class="filter-btn" data-filter="failed">Failed</button>
+  <button class="filter-btn" data-filter="tampered">Tampered</button>
+  <button class="filter-btn" data-filter="blocked">Blocked</button>
+</div>
+
+<div class="log-table-wrap">
+  {% if logs %}
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Timestamp</th>
+        <th>Action</th>
+        <th>File</th>
+        <th>Algorithm</th>
+        <th>Status</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in logs %}
+      <tr data-action="{{ entry.action }}" data-status="{{ entry.status }}">
+        <td style="color:var(--slate-soft);font-size:12px">{{ entry.id }}</td>
+        <td style="font-size:12px;color:var(--slate-mid);white-space:nowrap">{{ entry.timestamp }}</td>
+        <td><span class="log-action">{{ entry.action }}</span></td>
+        <td>
+          {% if entry.filename %}
+            <span class="file-name">{{ entry.filename }}</span>
+          {% else %}
+            <span style="color:var(--slate-soft);font-size:12px">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:13px">
+          {% if entry.algorithm %}
+            <span class="algo-tag
+              {% if entry.algorithm == 'AES-256-CBC' %}tag-aes
+              {% elif entry.algorithm == '3DES' %}tag-3des
+              {% elif entry.algorithm == 'ChaCha20' %}tag-chacha
+              {% endif %}" style="font-size:11px;padding:3px 10px">
+              {{ entry.algorithm }}
+            </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          <span class="log-status
+            {% if entry.status == 'success' %}ls-success
+            {% elif entry.status == 'failed' %}ls-failed
+            {% elif entry.status == 'tampered' %}ls-tampered
+            {% elif entry.status == 'blocked' %}ls-blocked
+            {% else %}ls-info{% endif %}">
+            {{ entry.status }}
+          </span>
+        </td>
+        <td style="font-size:12px;color:var(--slate-soft);max-width:220px">
+          {{ entry.details or '—' }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="log-empty">No audit records yet. Operations will be logged here automatically.</div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const f = this.dataset.filter;
+    document.querySelectorAll('tbody tr').forEach(row => {
+      const action = row.dataset.action || '';
+      const status = row.dataset.status || '';
+      if (f === 'all') { row.style.display = ''; return; }
+      if (f === 'failed' || f === 'tampered' || f === 'blocked') {
+        row.style.display = status === f ? '' : 'none';
+      } else {
+        row.style.display = action === f ? '' : 'none';
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

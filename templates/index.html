@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Vault — Financial Vault{% endblock %}
+
+{% block content %}
+<div class="page-title">Document Vault</div>
+<p class="page-sub">Encrypt, decrypt, and verify your financial documents.</p>
+
+<div class="grid-3">
+
+  <!-- ENCRYPT -->
+  <div class="card">
+    <div class="card-eyebrow">Protect</div>
+    <h2>Encrypt a File</h2>
+    <p class="card-desc">Choose your algorithm and secure a financial document.</p>
+    <form action="/encrypt" method="POST" enctype="multipart/form-data">
+      <div class="field">
+        <label>Document</label>
+        <input type="file" name="file" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" required>
+        <span class="hint">PDF, Excel, CSV, Word, TXT</span>
+      </div>
+      <div class="field">
+        <label>Algorithm</label>
+        <select id="algo-select" name="algorithm" required>
+          {% for a in algorithms %}
+            <option value="{{ a }}">{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="algo-badge badge-rec" id="info-AES-256-CBC">
+        <span class="badge-label">Recommended</span>
+        256-bit key · block cipher · PKCS#7 padding
+      </div>
+      <div class="algo-badge badge-leg hidden" id="info-3DES">
+        <span class="badge-label">Legacy</span>
+        168-bit key · block cipher · for comparison
+      </div>
+      <div class="algo-badge badge-mod hidden" id="info-ChaCha20">
+        <span class="badge-label">Modern</span>
+        256-bit key · stream cipher · no padding
+      </div>
+      <div class="field" style="margin-top:14px">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Choose a strong password" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Encrypt &amp; Vault</button>
+    </form>
+  </div>
+
+  <!-- DECRYPT -->
+  <div class="card">
+    <div class="card-eyebrow">Retrieve</div>
+    <h2>Decrypt a File</h2>
+    <p class="card-desc">Algorithm is read automatically from the vaulted file.</p>
+    <form action="/decrypt" method="POST">
+      <div class="field">
+        <label>Vaulted file</label>
+        <select name="enc_file" required>
+          {% if vault_files %}
+            {% for f in vault_files %}
+              <option value="{{ f.name }}">
+                {{ f.name }}{% if f.locked %} [LOCKED]{% endif %}
+              </option>
+            {% endfor %}
+          {% else %}
+            <option disabled selected>— vault is empty —</option>
+          {% endif %}
+        </select>
+      </div>
+      <div class="auto-note">Algorithm is stored inside each vaulted file and detected automatically.</div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Your password" required>
+      </div>
+      <button class="btn btn-decrypt" type="submit" {% if not vault_files %}disabled{% endif %}>
+        Decrypt &amp; Download
+      </button>
+    </form>
+  </div>
+
+  <!-- VERIFY -->
+  <div class="card">
+    <div class="card-eyebrow">Verify</div>
+    <h2>Check Integrity</h2>
+    <p class="card-desc">Confirm the SHA-256 fingerprint without downloading.</p>
+    <form action="/verify" method="POST">
+      <div class="field">
+        <label>Vaulted file</label>
+        <select name="enc_file" required>
+          {% if vault_files %}
+            {% for f in vault_files %}
+              <option value="{{ f.name }}">
+                {{ f.name }}{% if f.locked %} [LOCKED]{% endif %}
+              </option>
+            {% endfor %}
+          {% else %}
+            <option disabled selected>— vault is empty —</option>
+          {% endif %}
+        </select>
+      </div>
+      <div class="auto-note">Algorithm detected automatically from the file.</div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Your password" required>
+      </div>
+      <button class="btn btn-verify" type="submit" {% if not vault_files %}disabled{% endif %}>
+        Verify Hash
+      </button>
+    </form>
+  </div>
+
+</div>
+
+<!-- VAULT TABLE -->
+<div class="vault-section">
+  <div class="vault-header">
+    <h3>Vault Contents</h3>
+    {% if vault_files %}
+      <span class="vault-count">{{ vault_files|length }} file{{ 's' if vault_files|length != 1 }}</span>
+    {% endif %}
+  </div>
+  {% if vault_files %}
+  <table>
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Status</th>
+        <th>Attempts</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in vault_files %}
+      <tr>
+        <td><span class="file-name">{{ f.name }}</span></td>
+        <td>
+          {% if f.locked %}
+            <span class="status-pill pill-locked">Locked</span>
+          {% else %}
+            <span class="status-pill pill-ok">Available</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="attempt-bar">
+            <div class="attempt-pips">
+              {% for i in range(f.max) %}
+                <div class="pip {{ 'danger' if f.locked else ('used' if i < f.attempts else '') }}"></div>
+              {% endfor %}
+            </div>
+            <span style="font-size:11px;color:var(--slate-soft)">{{ f.attempts }}/{{ f.max }}</span>
+          </div>
+        </td>
+        <td>
+          <form action="/delete" method="POST" style="display:inline"
+                onsubmit="return confirm('Delete {{ f.name }} from vault?')">
+            <input type="hidden" name="enc_file" value="{{ f.name }}">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">No files in the vault yet — encrypt a document to get started.</div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const sel    = document.getElementById('algo-select');
+const badges = document.querySelectorAll('.algo-badge');
+function updateBadge() {
+  badges.forEach(b => b.classList.add('hidden'));
+  const el = document.getElementById('info-' + sel.value);
+  if (el) el.classList.remove('hidden');
+}
+sel.addEventListener('change', updateBadge);
+updateBadge();
+</script>
+{% endblock %}
